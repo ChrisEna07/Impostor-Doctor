@@ -6,7 +6,7 @@ import '../services/multiplayer_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/player_avatar.dart';
 
-enum ClientPhase { waiting, revealed, discussion, voting, result }
+enum ClientPhase { waiting, revealed, discussion, voting, result, nightAction, dawn }
 
 class RemotePlayerScreen extends StatefulWidget {
   final String gameType;
@@ -30,7 +30,10 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
   String _message = "Esperando que el Host inicie...";
   int _timerSeconds = 0;
   List<Map<String, dynamic>> _candidates = [];
+  List<Map<String, dynamic>> _nightTargets = []; // para acciones nocturnas
+  String? _nightActionType; // 'assassin' | 'doctor'
   Map<String, dynamic>? _resultData;
+  bool _nightActionDone = false;
 
   @override
   void initState() {
@@ -46,7 +49,8 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
           AudioService.instance.playReveal();
         } else if (data['type'] == 'phase_update') {
           setState(() {
-            String phaseStr = data['phase'];
+            final phaseStr = data['phase'] as String;
+            _nightActionDone = false;
             if (phaseStr == 'discussion') {
               _phase = ClientPhase.discussion;
               _timerSeconds = data['time'] ?? 0;
@@ -56,13 +60,33 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
             } else if (phaseStr == 'result' || phaseStr == 'voteResult') {
               _phase = ClientPhase.result;
               _resultData = Map<String, dynamic>.from(data);
-            } else if (phaseStr == 'night_intro') {
+            } else if (phaseStr == 'nightIntro') {
               _phase = ClientPhase.waiting;
               _message = "🌙 Cae la noche... ¡Cierra los ojos!";
-            } else if (phaseStr == 'night_action') {
-              _phase = ClientPhase.waiting;
-              _message = "🤐 Shhh... Acciones nocturnas en curso.";
+            } else if (phaseStr == 'nightAssassin') {
+              // Solo el asesino recibe lista de targets
+              if (_roleLabel == 'Asesino' || _roleLabel == 'asesino') {
+                _phase = ClientPhase.nightAction;
+                _nightActionType = 'assassin';
+                _nightTargets = List<Map<String, dynamic>>.from(data['targets'] ?? []);
+              } else {
+                _phase = ClientPhase.waiting;
+                _message = "🤐 Shhh... El Asesino está eligiendo...";
+              }
+            } else if (phaseStr == 'nightDoctor') {
+              // Solo el doctor recibe lista de targets
+              if (_roleLabel == 'Doctor' || _roleLabel == 'doctor') {
+                _phase = ClientPhase.nightAction;
+                _nightActionType = 'doctor';
+                _nightTargets = List<Map<String, dynamic>>.from(data['targets'] ?? []);
+              } else {
+                _phase = ClientPhase.waiting;
+                _message = "🤐 Shhh... El Doctor está actuando...";
+              }
             } else if (phaseStr == 'dawn') {
+              _phase = ClientPhase.dawn;
+              _resultData = data.containsKey('victim') ? Map<String, dynamic>.from(data) : null;
+            } else if (phaseStr == 'gameOver') {
               _phase = ClientPhase.result;
               _resultData = Map<String, dynamic>.from(data);
             }
@@ -115,10 +139,12 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
   String get _phaseLabel {
     switch (_phase) {
       case ClientPhase.waiting: return "SALA DE ESPERA";
-      case ClientPhase.revealed: return "PALABRA SECRETA";
-      case ClientPhase.discussion: return "DISCUSIÓN EN CURRO";
+      case ClientPhase.revealed: return widget.gameType == 'Doctor' ? "TU ROL SECRETO" : "PALABRA SECRETA";
+      case ClientPhase.discussion: return "DISCUSIÓN EN CURSO";
       case ClientPhase.voting: return "TIEMPO DE VOTAR";
       case ClientPhase.result: return "RESULTADOS";
+      case ClientPhase.nightAction: return _nightActionType == 'assassin' ? "🔪 ELIGE TU VÍCTIMA" : "💉 ELIGE A QUIÉN SALVAR";
+      case ClientPhase.dawn: return "🌅 AMANECER";
     }
   }
 
@@ -129,6 +155,8 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
       case ClientPhase.discussion: return _buildDiscussionUI();
       case ClientPhase.voting: return _buildVotingUI();
       case ClientPhase.result: return _buildResultUI();
+      case ClientPhase.nightAction: return _buildNightActionUI();
+      case ClientPhase.dawn: return _buildDawnUI();
     }
   }
 
@@ -163,11 +191,12 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
   }
 
   Widget _buildVotingUI() {
+    final label = widget.gameType == 'Doctor' ? "¿QUIÉN ES EL ASESINO?" : "¿QUIÉN ES EL IMPOSTOR?";
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
-          child: Text("¿QUIÉN ES EL IMPOSTOR?", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
         ),
         Expanded(
           child: ListView.builder(
@@ -185,8 +214,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
                   trailing: const Icon(Icons.how_to_vote_rounded, color: AppTheme.primary),
                   onTap: () {
                     MultiplayerService.instance.sendData({'type': 'vote_cast', 'targetId': c['id']});
-                    setState(() => _phase = ClientPhase.waiting);
-                    _message = "Voto enviado. Esperando resultados...";
+                    setState(() { _phase = ClientPhase.waiting; _message = "Voto enviado. Esperando resultados..."; });
                   },
                 ),
               );
@@ -195,6 +223,92 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildNightActionUI() {
+    if (_nightActionDone) return _buildWaitingUI();
+    final isAssassin = _nightActionType == 'assassin';
+    final color = isAssassin ? AppTheme.impostorRed : const Color(0xFF1A8C6A);
+    final icon = isAssassin ? Icons.local_fire_department_rounded : Icons.medical_services_rounded;
+    final hint = isAssassin ? "Elige a quién eliminar esta noche" : "Elige a quién proteger esta noche";
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(icon, size: 48, color: color),
+              const SizedBox(height: 12),
+              Text(hint, textAlign: TextAlign.center,
+                style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _nightTargets.isEmpty
+              ? Center(child: Text("No hay objetivos disponibles", style: TextStyle(color: Colors.white54)))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: _nightTargets.length,
+                  itemBuilder: (context, i) {
+                    final t = _nightTargets[i];
+                    return Card(
+                      color: AppTheme.surface,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: color.withOpacity(0.4)),
+                      ),
+                      child: ListTile(
+                        leading: PlayerAvatar(name: t['name'], size: 40),
+                        title: Text(t['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                        trailing: Icon(icon, color: color),
+                        onTap: () {
+                          AudioService.instance.playClick();
+                          final eventType = isAssassin ? 'night_assassin_choice' : 'night_doctor_choice';
+                          final key = isAssassin ? 'targetId' : 'saveId';
+                          MultiplayerService.instance.sendData({"type": eventType, key: t['id']});
+                          setState(() {
+                            _nightActionDone = true;
+                            _phase = ClientPhase.waiting;
+                            _message = isAssassin ? "Acción enviada. Espera el amanecer..." : "¡Jugador protegido! Espera el amanecer...";
+                          });
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDawnUI() {
+    final victim = _resultData?['victim'];
+    final saved = _resultData?['saved'] == true;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(saved ? "🌅 ¡Nadie murió!" : "🌅 Amanece...",
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
+        const SizedBox(height: 32),
+        if (saved) ...[
+          const Icon(Icons.favorite_rounded, size: 80, color: Color(0xFF1A8C6A)),
+          const SizedBox(height: 16),
+          const Text("¡El Doctor salvó a alguien!", style: TextStyle(color: Color(0xFF1A8C6A), fontSize: 18, fontWeight: FontWeight.bold)),
+        ] else if (victim != null) ...[
+          PlayerAvatar(name: victim, size: 80),
+          const SizedBox(height: 16),
+          Text(victim, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text("fue eliminado/a esta noche", style: TextStyle(color: AppTheme.impostorRed, fontSize: 16)),
+        ] else ...[
+          const Icon(Icons.bedtime_rounded, size: 80, color: Colors.white38),
+          const SizedBox(height: 16),
+          const Text("La noche fue tranquila...", style: TextStyle(color: Colors.white54, fontSize: 16)),
+        ],
+      ],
+    ).animate().fadeIn();
   }
 
   Widget _buildResultUI() {

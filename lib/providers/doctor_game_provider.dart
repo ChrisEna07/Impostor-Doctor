@@ -123,8 +123,24 @@ class DoctorGameProvider extends ChangeNotifier {
   }
 
   void doctorChoose(String saveId) {
-    nightSaveTarget = players.firstWhere((p) => p.id == saveId);
+    // Guard: if no living doctor, skip save
+    final hasLivingDoctor = players.any((p) => p.role == DoctorRole.doctor && p.isAlive);
+    if (!hasLivingDoctor) {
+      _resolveDawn();
+      return;
+    }
+    final target = players.firstWhere(
+      (p) => p.id == saveId,
+      orElse: () => players.first,
+    );
+    nightSaveTarget = target;
     nightSaveTarget!.savedByDoctor = true;
+    _resolveDawn();
+  }
+
+  /// Called when doctor has no living player to save (remote skip)
+  void skipDoctorTurn() {
+    nightSaveTarget = null;
     _resolveDawn();
   }
 

@@ -28,19 +28,49 @@ class _DoctorGameScreenState extends State<DoctorGameScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final dgp = context.read<DoctorGameProvider>();
-      
-      // Escuchar cambios de fase para transmitir
+      String _lastPhase = '';
+
+      // Escuchar datos remotos (acciones de noche) ANTES de iniciar
+      MultiplayerService.instance.onDataReceived = (endpointId, data) {
+        if (data is Map && mounted) {
+          final dgpLive = context.read<DoctorGameProvider>();
+          switch (data['type']) {
+            case 'night_assassin_choice':
+              final targetId = data['targetId'] as String?;
+              if (targetId != null) dgpLive.assassinChoose(targetId);
+              break;
+            case 'night_doctor_choice':
+              final saveId = data['saveId'] as String?;
+              if (saveId != null) dgpLive.doctorChoose(saveId);
+              break;
+            case 'vote_cast':
+              final targetId = data['targetId'] as String?;
+              if (targetId != null) dgpLive.castVote(targetId);
+              break;
+            case 'discussion_ready':
+              dgpLive.startDiscussion();
+              break;
+          }
+        }
+      };
+
+      // Escuchar cambios de fase y transmitir SOLO cuando cambia
       dgp.addListener(() {
         if (mounted) {
-          MultiplayerService.instance.broadcastData({
-            'type': 'phase_update',
-            'phase': dgp.phase.name, 
-          });
+          final phaseName = dgp.phase.name;
+          if (phaseName != _lastPhase) {
+            _lastPhase = phaseName;
+            MultiplayerService.instance.broadcastData({
+              'type': 'phase_update',
+              'phase': phaseName,
+            });
+          }
         }
       });
 
       dgp.startGame();
       
+      // Distribuir roles de forma privada
       for (var p in dgp.players) {
         if (p.endpointId != null) {
           MultiplayerService.instance.sendDataTo(p.endpointId!, {
@@ -78,13 +108,45 @@ class _DoctorGameScreenState extends State<DoctorGameScreen> {
     if (phase == DoctorPhase.nightAssassin) {
       final assassins = dgp.players.where((p) => p.role == DoctorRole.asesino).toList();
       if (assassins.isNotEmpty && assassins.every((a) => a.endpointId != null)) {
+        // Enviar lista de targets a los asesinos remotos
+        final targets = dgp.alivePlayers
+            .where((p) => p.role != DoctorRole.asesino)
+            .map((p) => {'id': p.id, 'name': p.name})
+            .toList();
+        for (final a in assassins) {
+          MultiplayerService.instance.sendDataTo(a.endpointId!, {
+            'type': 'phase_update',
+            'phase': 'nightAssassin',
+            'targets': targets,
+          });
+        }
         return _waitingScreen("El Asesino está actuando...");
       }
     } else if (phase == DoctorPhase.nightDoctor) {
       final doctors = dgp.players.where((p) => p.role == DoctorRole.doctor).toList();
       if (doctors.isNotEmpty && doctors.every((d) => d.endpointId != null)) {
+        // Enviar lista de targets al doctor remoto
+        final targets = dgp.alivePlayers
+            .map((p) => {'id': p.id, 'name': p.name})
+            .toList();
+        for (final d in doctors) {
+          MultiplayerService.instance.sendDataTo(d.endpointId!, {
+            'type': 'phase_update',
+            'phase': 'nightDoctor',
+            'targets': targets,
+          });
+        }
         return _waitingScreen("El Doctor está actuando...");
       }
+    } else if (phase == DoctorPhase.dawn) {
+      // Enriquecer el broadcast de amanecer con info de víctima
+      final victim = dgp.dawnVictim;
+      Future.microtask(() => MultiplayerService.instance.broadcastData({
+        'type': 'phase_update',
+        'phase': 'dawn',
+        'victim': victim?.name,
+        'saved': dgp.savedThisNight,
+      }));
     }
 
     switch (phase) {

@@ -25,14 +25,19 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final gp = context.read<GameProvider>();
+      String _lastPhase = '';
       
-      // Escuchar cambios de fase para transmitir
+      // Escuchar cambios de fase y transmitir SOLO cuando cambia
       gp.addListener(() {
         if (mounted) {
-          MultiplayerService.instance.broadcastData({
-            'type': 'phase_update',
-            'phase': gp.phase.name, 
-          });
+          final phaseName = gp.phase.name;
+          if (phaseName != _lastPhase) {
+            _lastPhase = phaseName;
+            MultiplayerService.instance.broadcastData({
+              'type': 'phase_update',
+              'phase': phaseName,
+            });
+          }
         }
       });
 

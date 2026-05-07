@@ -62,101 +62,103 @@ class _SetupScreenState extends State<SetupScreen> {
         body: Container(
           decoration: const BoxDecoration(gradient: AppGradients.dark),
           child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 16),
-                  // ── LOGO / TÍTULO ───────────────────────────────────────────
-                  _buildHeader(isMultiplayer: isMultiplayer)
-                      .animate()
-                      .fadeIn(duration: 600.ms)
-                      .slideY(begin: -0.3),
-                  const SizedBox(height: 32),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 16),
+                        _buildHeader(isMultiplayer: isMultiplayer)
+                            .animate()
+                            .fadeIn(duration: 600.ms)
+                            .slideY(begin: -0.3),
+                        const SizedBox(height: 32),
 
-                  // ── AGREGAR JUGADOR (solo modo local) ──────────────────────
-                  if (!isMultiplayer) ...[
-                    _buildAddPlayerCard(gp)
-                        .animate()
-                        .fadeIn(delay: 200.ms, duration: 500.ms)
-                        .slideY(begin: 0.2),
-                    const SizedBox(height: 24),
-                  ] else ...[
-                    _buildMultiplayerBanner(gp)
-                        .animate()
-                        .fadeIn(delay: 200.ms, duration: 500.ms),
-                    const SizedBox(height: 24),
-                  ],
+                        if (!isMultiplayer) ...[
+                          _buildAddPlayerCard(gp)
+                              .animate()
+                              .fadeIn(delay: 200.ms, duration: 500.ms)
+                              .slideY(begin: 0.2),
+                          const SizedBox(height: 24),
+                        ] else ...[
+                          _buildMultiplayerBanner(gp)
+                              .animate()
+                              .fadeIn(delay: 200.ms, duration: 500.ms),
+                          const SizedBox(height: 24),
+                        ],
 
-                  // ── LISTA JUGADORES ─────────────────────────────────────────
-                  if (gp.players.isNotEmpty) ...[
-                    _buildPlayerList(gp)
-                        .animate()
-                        .fadeIn(delay: 300.ms, duration: 500.ms),
-                    const SizedBox(height: 24),
-                  ],
+                        if (gp.players.isNotEmpty) ...[
+                          _buildPlayerList(gp)
+                              .animate()
+                              .fadeIn(delay: 300.ms, duration: 500.ms),
+                          const SizedBox(height: 24),
+                        ],
 
-                  // ── CONFIGURACIÓN ───────────────────────────────────────────
-                  _buildSettingsToggle(gp)
-                      .animate()
-                      .fadeIn(delay: 400.ms, duration: 500.ms),
-                  const SizedBox(height: 32),
+                        _buildSettingsToggle(gp)
+                            .animate()
+                            .fadeIn(delay: 400.ms, duration: 500.ms),
+                        const SizedBox(height: 32),
 
-                  // ── BOTÓN INICIAR ───────────────────────────────────────────
-                  GradientButton(
-                    text: 'INICIAR JUEGO',
-                    icon: Icons.play_arrow_rounded,
-                    width: double.infinity,
-                    onPressed: gp.canStartGame
-                        ? () {
-                            AudioService.instance.playClick();
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChangeNotifierProvider.value(
-                                  value: gp,
-                                  child: const GameScreen(),
-                                ),
-                              ),
-                            );
-                          }
-                        : null,
-                  ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
+                        GradientButton(
+                          text: 'INICIAR JUEGO',
+                          icon: Icons.play_arrow_rounded,
+                          width: double.infinity,
+                          onPressed: gp.canStartGame
+                              ? () {
+                                  AudioService.instance.playClick();
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ChangeNotifierProvider.value(
+                                        value: gp,
+                                        child: const GameScreen(),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              : null,
+                        ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                  if (!gp.canStartGame && !isMultiplayer) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Necesitas mínimo ${gp.settings.minPlayers} jugadores',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                      ),
+                        if (!gp.canStartGame && !isMultiplayer) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Necesitas mínimo ${gp.settings.minPlayers} jugadores',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+                        const Center(
+                          child: Text(
+                            'by ChrizDev',
+                            style: TextStyle(
+                              color: Color(0xFF39FF14),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                              shadows: [Shadow(color: Color(0xFF39FF14), blurRadius: 4)],
+                            ),
+                          ),
+                        ).animate().fadeIn(delay: 800.ms),
+                        const SizedBox(height: 16),
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 32),
-                  // Firma
-                  const Center(
-                    child: Text(
-                      'by ChrizDev',
-                      style: TextStyle(
-                        color: Color(0xFF39FF14),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                        shadows: [Shadow(color: Color(0xFF39FF14), blurRadius: 4)],
-                      ),
-                    ),
-                  ).animate().fadeIn(delay: 800.ms),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),
       ),
     );
   }
+
 
   /// Diálogo de confirmación para salir de la app
   Future<bool> _confirmAppExit(BuildContext context) async {
@@ -242,14 +244,15 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget _buildHeader({bool isMultiplayer = false}) {
     return Column(
       children: [
-        if (isMultiplayer)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            ),
+        // Back button: en red vuelve al lobby, en local vuelve al home
+        Align(
+          alignment: Alignment.centerLeft,
+          child: IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            tooltip: isMultiplayer ? 'Volver al lobby' : 'Menú principal',
           ),
+        ),
         Container(
           width: 90,
           height: 90,

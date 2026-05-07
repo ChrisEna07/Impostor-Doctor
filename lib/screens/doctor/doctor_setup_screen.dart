@@ -50,11 +50,15 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
       body: Container(
         decoration: const BoxDecoration(gradient: AppGradients.dark),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                 const SizedBox(height: 12),
                 _buildHeader(isMultiplayer: isMultiplayer).animate().fadeIn(duration: 600.ms).slideY(begin: -0.2),
                 const SizedBox(height: 28),
@@ -117,6 +121,9 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
                 const SizedBox(height: 28),
               ],
             ),
+                ),
+              );
+            },
           ),
         ),
       ),
