@@ -1,0 +1,42 @@
+name: impostor_doctor
+description: "Impostor & Doctor - Juego de grupos"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+  shared_preferences: ^2.3.3
+  audioplayers: ^6.1.0
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  confetti: ^0.7.0
+  uuid: ^4.5.1
+  nearby_connections: ^4.3.0
+  package_info_plus: ^10.1.0
+  permission_handler: ^12.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/words/
+    - assets/sounds/
+    - assets/images/
