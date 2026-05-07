@@ -44,6 +44,7 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final gp = context.watch<DoctorGameProvider>();
+    final isMultiplayer = gp.players.any((p) => p.endpointId != null);
 
     return Scaffold(
       body: Container(
@@ -55,10 +56,15 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 12),
-                _buildHeader().animate().fadeIn(duration: 600.ms).slideY(begin: -0.2),
+                _buildHeader(isMultiplayer: isMultiplayer).animate().fadeIn(duration: 600.ms).slideY(begin: -0.2),
                 const SizedBox(height: 28),
-                _buildAddCard(gp).animate().fadeIn(delay: 200.ms),
-                const SizedBox(height: 20),
+                if (!isMultiplayer) ...[
+                  _buildAddCard(gp).animate().fadeIn(delay: 200.ms),
+                  const SizedBox(height: 20),
+                ] else ...[
+                  _buildMultiplayerBanner(gp).animate().fadeIn(delay: 200.ms),
+                  const SizedBox(height: 20),
+                ],
                 if (gp.players.isNotEmpty) ...[
                   _buildPlayerList(gp).animate().fadeIn(delay: 300.ms),
                   const SizedBox(height: 20),
@@ -86,7 +92,7 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
                         }
                       : null,
                 ).animate().fadeIn(delay: 500.ms),
-                if (!gp.canStart) ...[
+                if (!gp.canStart && !isMultiplayer) ...[
                   const SizedBox(height: 10),
                   Text(
                     'Necesitas mínimo ${gp.settings.minPlayers} jugadores',
@@ -117,18 +123,18 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({bool isMultiplayer = false}) {
     return Row(
       children: [
         IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textPrimary),
         ),
-        const Expanded(
+        Expanded(
           child: Column(
             children: [
-              Text('💉', style: TextStyle(fontSize: 40)),
-              Text(
+              const Text('💉', style: TextStyle(fontSize: 40)),
+              const Text(
                 'MÓDULO DOCTOR',
                 style: TextStyle(
                   fontSize: 22,
@@ -138,8 +144,8 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
                 ),
               ),
               Text(
-                'Doctor • Asesino • Ciudadanos',
-                style: TextStyle(color: _doctorGreen, fontSize: 13),
+                isMultiplayer ? 'Modo Red 🌐' : 'Asesino, Doctor y Civiles',
+                style: const TextStyle(color: _doctorGreen, fontSize: 13),
               ),
             ],
           ),
@@ -149,7 +155,57 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
     );
   }
 
+  Widget _buildMultiplayerBanner(DoctorGameProvider gp) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _doctorGreen.withValues(alpha: 0.5), width: 2),
+        boxShadow: [
+          BoxShadow(color: _doctorGreen.withValues(alpha: 0.15), blurRadius: 20),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.wifi_tethering_rounded, color: _doctorGreen, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                'Jugadores en red (${gp.players.length})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: gp.players.map((p) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.circle, color: Color(0xFF39FF14), size: 8),
+                const SizedBox(width: 6),
+                Text(
+                  p.endpointId != null ? '${p.name} (Red)' : '${p.name} (Host)',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ],
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAddCard(DoctorGameProvider gp) {
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

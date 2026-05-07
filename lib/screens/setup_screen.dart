@@ -47,13 +47,16 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final gp = context.watch<GameProvider>();
+    final isMultiplayer = gp.players.any((p) => p.endpointId != null);
 
     return PopScope(
-      canPop: false,
+      canPop: isMultiplayer,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final leave = await _confirmAppExit(context);
-        if (leave) SystemNavigator.pop();
+        if (!isMultiplayer) {
+          final leave = await _confirmAppExit(context);
+          if (leave) SystemNavigator.pop();
+        }
       },
       child: Scaffold(
         body: Container(
@@ -66,18 +69,25 @@ class _SetupScreenState extends State<SetupScreen> {
                 children: [
                   const SizedBox(height: 16),
                   // ── LOGO / TÍTULO ───────────────────────────────────────────
-                  _buildHeader()
+                  _buildHeader(isMultiplayer: isMultiplayer)
                       .animate()
                       .fadeIn(duration: 600.ms)
                       .slideY(begin: -0.3),
                   const SizedBox(height: 32),
 
-                  // ── AGREGAR JUGADOR ─────────────────────────────────────────
-                  _buildAddPlayerCard(gp)
-                      .animate()
-                      .fadeIn(delay: 200.ms, duration: 500.ms)
-                      .slideY(begin: 0.2),
-                  const SizedBox(height: 24),
+                  // ── AGREGAR JUGADOR (solo modo local) ──────────────────────
+                  if (!isMultiplayer) ...[
+                    _buildAddPlayerCard(gp)
+                        .animate()
+                        .fadeIn(delay: 200.ms, duration: 500.ms)
+                        .slideY(begin: 0.2),
+                    const SizedBox(height: 24),
+                  ] else ...[
+                    _buildMultiplayerBanner(gp)
+                        .animate()
+                        .fadeIn(delay: 200.ms, duration: 500.ms),
+                    const SizedBox(height: 24),
+                  ],
 
                   // ── LISTA JUGADORES ─────────────────────────────────────────
                   if (gp.players.isNotEmpty) ...[
@@ -113,7 +123,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         : null,
                   ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                  if (!gp.canStartGame) ...[
+                  if (!gp.canStartGame && !isMultiplayer) ...[
                     const SizedBox(height: 12),
                     Text(
                       'Necesitas mínimo ${gp.settings.minPlayers} jugadores',
@@ -229,9 +239,17 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  Widget _buildHeader() {
+  Widget _buildHeader({bool isMultiplayer = false}) {
     return Column(
       children: [
+        if (isMultiplayer)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            ),
+          ),
         Container(
           width: 90,
           height: 90,
@@ -278,12 +296,61 @@ class _SetupScreenState extends State<SetupScreen> {
             color: AppTheme.surfaceLight,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Text(
-            'Módulo Impostor',
-            style: TextStyle(color: AppTheme.accent, fontSize: 13),
+          child: Text(
+            isMultiplayer ? 'Impostor · Modo Red 🌐' : 'Módulo Impostor',
+            style: const TextStyle(color: AppTheme.accent, fontSize: 13),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMultiplayerBanner(GameProvider gp) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5), width: 2),
+        boxShadow: [
+          BoxShadow(color: AppTheme.primary.withValues(alpha: 0.15), blurRadius: 20),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.wifi_tethering_rounded, color: AppTheme.primary, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                'Jugadores en red (${gp.players.length})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: gp.players.map((p) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.circle, color: Color(0xFF39FF14), size: 8),
+                const SizedBox(width: 6),
+                Text(
+                  p.endpointId != null ? '${p.name} (Red)' : '${p.name} (Host)',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ],
+            )).toList(),
+          ),
+        ],
+      ),
     );
   }
 
