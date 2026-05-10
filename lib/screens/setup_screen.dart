@@ -274,13 +274,16 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'IMPOSTOR',
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w900,
-            color: AppTheme.textPrimary,
-            letterSpacing: 6,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: const Text(
+            'IMPOSTOR',
+            style: TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.textPrimary,
+              letterSpacing: 6,
+            ),
           ),
         ),
         const Text(

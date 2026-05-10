@@ -41,8 +41,8 @@ class _VotingScreenState extends State<VotingScreen> {
       
       // Escuchar votos remotos
       MultiplayerService.instance.onDataReceived = (id, data) {
-        if (data is Map && data['type'] == 'vote_cast') {
-          gp.castVote(data['targetId']);
+        if (data is Map && data['type'] == 'vote_cast' && mounted) {
+          context.read<GameProvider>().castVote(data['targetId'], voterId: id);
         }
       };
     } else {
@@ -71,7 +71,9 @@ class _VotingScreenState extends State<VotingScreen> {
   @override
   Widget build(BuildContext context) {
     final gp = context.watch<GameProvider>();
-    if (gp.votingTurnIndex >= gp.players.length) {
+    bool isMultiplayer = gp.players.any((p) => p.endpointId != null);
+    
+    if (gp.votingTurnIndex >= gp.players.length && !isMultiplayer) {
       return const Scaffold(
         backgroundColor: AppTheme.bgDark,
         body: Center(child: CircularProgressIndicator()),
@@ -84,9 +86,11 @@ class _VotingScreenState extends State<VotingScreen> {
       body: Container(
         decoration: const BoxDecoration(gradient: AppGradients.dark),
         child: SafeArea(
-          child: isRemoteVoter
-              ? _buildRemoteWaiting(voter)
-              : (_step == 0 ? _buildConfirmStep(voter) : _buildVoteStep(gp, voter)),
+          child: isMultiplayer 
+              ? _buildMultiplayerHostStatus(gp)
+              : (isRemoteVoter
+                  ? _buildRemoteWaiting(voter)
+                  : (_step == 0 ? _buildConfirmStep(voter) : _buildVoteStep(gp, voter))),
         ),
       ),
     );
@@ -152,13 +156,16 @@ class _VotingScreenState extends State<VotingScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '¿Quién es el\nImpostor?',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.textPrimary,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: const Text(
+              '¿Quién es el\nImpostor?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 32),
@@ -167,12 +174,15 @@ class _VotingScreenState extends State<VotingScreen> {
             style: TextStyle(color: AppTheme.textSecondary, fontSize: 15),
           ),
           const SizedBox(height: 8),
-          Text(
-            player.name,
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.secondary,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              player.name,
+              style: const TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.secondary,
+              ),
             ),
           ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.3),
           const SizedBox(height: 48),
@@ -185,6 +195,48 @@ class _VotingScreenState extends State<VotingScreen> {
             gradient: _confirming ? AppGradients.safe : AppGradients.primary,
             onPressed: _confirming ? null : _confirmIdentity,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMultiplayerHostStatus(GameProvider gp) {
+    int totalVotes = gp.votes.length;
+    int totalPlayers = gp.players.length;
+
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.how_to_vote_rounded, size: 80, color: AppTheme.primary)
+              .animate(onPlay: (c) => c.repeat()).shimmer(),
+          const SizedBox(height: 32),
+          const Text("VOTACIÓN EN CURSO", 
+            style: TextStyle(color: AppTheme.textSecondary, letterSpacing: 2, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Text("$totalVotes / $totalPlayers", 
+            style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w900, color: Colors.white)),
+          const Text("Votos recibidos", style: TextStyle(color: Colors.white70)),
+          const SizedBox(height: 48),
+          
+          // El Host también debe votar si es local_host
+          if (gp.votes['local_host'] == null)
+            GradientButton(
+              text: "VOTAR AHORA",
+              icon: Icons.touch_app_rounded,
+              onPressed: () => setState(() => _step = 1),
+            )
+          else
+            const Text("Ya has emitido tu voto. Esperando a los demás...", 
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.safeGreen, fontWeight: FontWeight.bold)),
+
+          if (_step == 1)
+            ...[
+              const SizedBox(height: 24),
+              Expanded(child: _buildVoteStep(gp, gp.players.firstWhere((p) => p.id == 'local_host'))),
+            ]
         ],
       ),
     );

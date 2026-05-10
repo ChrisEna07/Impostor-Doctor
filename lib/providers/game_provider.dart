@@ -162,16 +162,27 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void castVote(String suspectId) {
-    if (votingCurrentPlayerId == null) return;
-    votes[votingCurrentPlayerId!] = suspectId;
+  void castVote(String suspectId, {String? voterId}) {
+    final effectiveVoterId = voterId ?? votingCurrentPlayerId;
+    if (effectiveVoterId == null) return;
+    
+    votes[effectiveVoterId] = suspectId;
 
-    // Avanzar al siguiente votante (se salta a sí mismo — ya está filtrado en UI)
-    votingTurnIndex++;
-    if (votingTurnIndex < players.length) {
-      votingCurrentPlayerId = players[votingTurnIndex].id;
+    // Si estamos en modo multijugador (hay remotos), esperamos a que todos voten
+    bool isMultiplayer = players.any((p) => p.endpointId != null);
+    
+    if (isMultiplayer) {
+      if (votes.length >= players.length) {
+        _resolveVoting();
+      }
     } else {
-      _resolveVoting();
+      // En modo local seguimos el turno secuencial
+      votingTurnIndex++;
+      if (votingTurnIndex < players.length) {
+        votingCurrentPlayerId = players[votingTurnIndex].id;
+      } else {
+        _resolveVoting();
+      }
     }
     notifyListeners();
   }
@@ -208,19 +219,23 @@ class GameProvider extends ChangeNotifier {
   }
 
   void _assignPoints() {
-    final impostor = players[impostorIndex];
-    if (impostorCaught) {
-      // Jugadores normales que votaron al impostor ganan puntos
-      for (final entry in votes.entries) {
-        if (entry.value == impostor.id) {
-          final voter = players.firstWhere((p) => p.id == entry.key);
-          voter.points += settings.pointsForCorrectVote;
+    final impostorId = players[impostorIndex].id;
+    
+    // 1. Cualquier jugador que vote por el impostor gana puntos, sea atrapado o no
+    for (final entry in votes.entries) {
+      if (entry.value == impostorId) {
+        final voterIdx = players.indexWhere((p) => p.id == entry.key);
+        if (voterIdx != -1) {
+          players[voterIdx].points += settings.pointsForCorrectVote;
         }
       }
-    } else {
-      // Impostor sobrevivió
-      impostor.points += settings.pointsForSurviving;
     }
+    
+    // 2. Si el impostor sobrevive (no fue atrapado), gana puntos por sobrevivir
+    if (!impostorCaught) {
+      players[impostorIndex].points += settings.pointsForSurviving;
+    }
+    
     notifyListeners();
   }
 
@@ -258,6 +273,20 @@ class GameProvider extends ChangeNotifier {
     eliminatedPlayer = null;
     impostorCaught = false;
     notifyListeners();
+  }
+
+  void toggleReady(String playerId) {
+    final idx = players.indexWhere((p) => p.id == playerId);
+    if (idx != -1) {
+      players[idx].isReady = !players[idx].isReady;
+      notifyListeners();
+    }
+  }
+
+  bool get allPlayersReady {
+    if (players.isEmpty) return false;
+    // En multijugador, todos los remotos deben estar listos. El host (local) se asume listo.
+    return players.every((p) => p.endpointId == null || p.isReady);
   }
 
   void fullReset() {

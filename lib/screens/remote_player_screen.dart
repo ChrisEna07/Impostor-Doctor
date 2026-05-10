@@ -6,7 +6,7 @@ import '../services/multiplayer_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/player_avatar.dart';
 
-enum ClientPhase { waiting, revealed, discussion, voting, result, nightAction, dawn }
+enum ClientPhase { waiting, revealed, discussion, voting, result, nightAction, dawn, scoreboard }
 
 class RemotePlayerScreen extends StatefulWidget {
   final String gameType;
@@ -34,6 +34,9 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
   String? _nightActionType; // 'assassin' | 'doctor'
   Map<String, dynamic>? _resultData;
   bool _nightActionDone = false;
+  List<Map<String, dynamic>> _scores = [];
+  int _currentRound = 1;
+  bool _isReady = false;
 
   @override
   void initState() {
@@ -89,6 +92,10 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
             } else if (phaseStr == 'gameOver') {
               _phase = ClientPhase.result;
               _resultData = Map<String, dynamic>.from(data);
+            } else if (phaseStr == 'scoreboard') {
+              _phase = ClientPhase.scoreboard;
+              _scores = List<Map<String, dynamic>>.from(data['scores'] ?? []);
+              _currentRound = data['round'] ?? 1;
             }
           });
         } else if (data['type'] == 'timer_update') {
@@ -145,6 +152,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
       case ClientPhase.result: return "RESULTADOS";
       case ClientPhase.nightAction: return _nightActionType == 'assassin' ? "🔪 ELIGE TU VÍCTIMA" : "💉 ELIGE A QUIÉN SALVAR";
       case ClientPhase.dawn: return "🌅 AMANECER";
+      case ClientPhase.scoreboard: return "MARCADOR";
     }
   }
 
@@ -157,6 +165,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
       case ClientPhase.result: return _buildResultUI();
       case ClientPhase.nightAction: return _buildNightActionUI();
       case ClientPhase.dawn: return _buildDawnUI();
+      case ClientPhase.scoreboard: return _buildScoreboardUI();
     }
   }
 
@@ -167,6 +176,40 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
         const CircularProgressIndicator(color: AppTheme.primary).animate(onPlay: (c) => c.repeat()).shimmer(),
         const SizedBox(height: 24),
         Text(_message, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+        const SizedBox(height: 48),
+        
+        // Botón de LISTO
+        GestureDetector(
+          onTap: () {
+            setState(() => _isReady = !_isReady);
+            MultiplayerService.instance.sendData({'type': 'ready_toggle', 'ready': _isReady});
+            AudioService.instance.playClick();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: _isReady ? AppGradients.safe : AppGradients.primary,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: (_isReady ? AppTheme.safeGreen : AppTheme.primary).withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_isReady ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Text(_isReady ? "¡ESTOY LISTO!" : "DAR LISTO", 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
+        ).animate().fadeIn(delay: 500.ms).scale(),
       ],
     );
   }
@@ -316,19 +359,66 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
     bool caught = _resultData!['caught'] ?? false;
     String eliminatedName = _resultData!['eliminatedName'] ?? "Nadie";
     
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(caught ? "¡VICTORIA!" : "¡DERROTA!", 
+            style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: caught ? AppTheme.safeGreen : AppTheme.impostorRed)),
+          const SizedBox(height: 24),
+          PlayerAvatar(name: eliminatedName, size: 100),
+          const SizedBox(height: 16),
+          Text(eliminatedName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(caught ? "Era el Impostor" : "Era inocente...", style: const TextStyle(color: AppTheme.textSecondary)),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(16)),
+            child: Column(
+              children: [
+                Text("Palabra Inocente: ${_resultData!['normalWord']}", style: const TextStyle(color: AppTheme.safeGreen, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text("Palabra Impostor: ${_resultData!['impostorWord']}", style: const TextStyle(color: AppTheme.impostorRed, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text("Espera a que el Host muestre el marcador...", style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreboardUI() {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(caught ? "¡VICTORIA!" : "¡DERROTA!", 
-          style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: caught ? AppTheme.safeGreen : AppTheme.impostorRed)),
-        const SizedBox(height: 24),
-        PlayerAvatar(name: eliminatedName, size: 100),
-        const SizedBox(height: 16),
-        Text(eliminatedName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        Text(caught ? "Era el Impostor" : "Era inocente...", style: const TextStyle(color: AppTheme.textSecondary)),
-        const SizedBox(height: 40),
-        Text("Palabra Inocente: ${_resultData!['normalWord']}", style: const TextStyle(color: AppTheme.safeGreen)),
-        Text("Palabra Impostor: ${_resultData!['impostorWord']}", style: const TextStyle(color: AppTheme.impostorRed)),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text("RONDA $_currentRound FINALIZADA", style: const TextStyle(color: AppTheme.accent, fontWeight: FontWeight.bold)),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: _scores.length,
+            itemBuilder: (context, i) {
+              final s = _scores[i];
+              return Card(
+                color: AppTheme.surface,
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: PlayerAvatar(name: s['name'], size: 36),
+                  title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                  trailing: Text("${s['points']} pts", style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w900, fontSize: 16)),
+                ),
+              );
+            },
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text("El Host iniciará la siguiente ronda pronto...", style: TextStyle(color: Colors.white54)),
+        ),
       ],
     );
   }

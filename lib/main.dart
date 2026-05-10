@@ -7,7 +7,8 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AudioService.instance.init();
+  // No esperamos a que el audio inicialice para no bloquear el arranque en emuladores
+  AudioService.instance.init();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

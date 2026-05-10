@@ -11,7 +11,7 @@ class MultiplayerService {
   MultiplayerService._();
   static final MultiplayerService instance = MultiplayerService._();
 
-  final Strategy strategy = Strategy.P2P_STAR;
+  final Strategy strategy = Strategy.P2P_CLUSTER;
   final String serviceId = "com.chrizdev.impostordoctor";
   ConnectionStatus status = ConnectionStatus.idle;
   
@@ -44,24 +44,34 @@ class MultiplayerService {
       bool granted = await checkPermissions();
       if (!granted) return;
 
+      // No detenemos endpoints para permitir que otros se unan si ya hay alguien
+      await Nearby().stopAdvertising(); 
+      
       await Nearby().startAdvertising(
         userName,
         strategy,
         serviceId: serviceId,
         onConnectionInitiated: (id, info) {
+          debugPrint('Conexión iniciada con $id (${info.endpointName})');
           onConnectionInitiated?.call(id, info);
         },
         onConnectionResult: (id, status) {
+          debugPrint('Resultado de conexión con $id: $status');
           if (status == Status.CONNECTED) {
             connectedEndpointIds.add(id);
             this.status = ConnectionStatus.connected;
             onConnected?.call(id);
+            // Reiniciamos publicidad para asegurar que otros nos vean (algunos dispositivos la ocultan al conectar)
+            // Pero con cuidado de no romper la conexión actual
           }
         },
         onDisconnected: (id) {
+          debugPrint('Desconectado de $id');
           connectedEndpointIds.remove(id);
           endpointNames.remove(id);
-          if (connectedEndpointIds.isEmpty) status = ConnectionStatus.hosting;
+          if (connectedEndpointIds.isEmpty) {
+            this.status = ConnectionStatus.hosting;
+          }
           onDisconnected?.call(id);
         },
       );
@@ -76,14 +86,18 @@ class MultiplayerService {
       bool granted = await checkPermissions();
       if (!granted) return;
 
+      await Nearby().stopDiscovery();
+
       await Nearby().startDiscovery(
         userName,
         strategy,
         serviceId: serviceId,
         onEndpointFound: (id, name, serviceId) {
+          debugPrint('Endpoint encontrado: $id ($name)');
           onEndpointFound?.call(id, name);
         },
         onEndpointLost: (id) {
+          debugPrint('Endpoint perdido: $id');
           onEndpointLost?.call(id);
         },
       );
@@ -94,6 +108,7 @@ class MultiplayerService {
   }
 
   Future<void> requestConnection(String userName, String id) async {
+    debugPrint('Solicitando conexión a $id');
     await Nearby().requestConnection(
       userName,
       id,
@@ -117,6 +132,7 @@ class MultiplayerService {
   }
 
   void acceptConnection(String id) {
+    debugPrint('Aceptando conexión de $id');
     Nearby().acceptConnection(
       id,
       onPayLoadRecieved: (id, payload) {
@@ -139,7 +155,6 @@ class MultiplayerService {
   }
 
   void sendData(dynamic data) {
-    // Enviar a todos los conectados por defecto o al primero si es necesario
     for (var id in connectedEndpointIds) {
       sendDataTo(id, data);
     }
@@ -151,6 +166,16 @@ class MultiplayerService {
     for (var id in endpointNames.keys) {
       Nearby().sendBytesPayload(id, bytes);
     }
+  }
+
+  Future<void> stopAdvertising() async {
+    await Nearby().stopAdvertising();
+    if (connectedEndpointIds.isEmpty) status = ConnectionStatus.idle;
+  }
+
+  Future<void> stopDiscovery() async {
+    await Nearby().stopDiscovery();
+    if (connectedEndpointIds.isEmpty) status = ConnectionStatus.idle;
   }
 
   Future<void> stopAll() async {

@@ -141,13 +141,16 @@ class _DoctorSetupScreenState extends State<DoctorSetupScreen> {
           child: Column(
             children: [
               const Text('💉', style: TextStyle(fontSize: 40)),
-              const Text(
-                'MÓDULO DOCTOR',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textPrimary,
-                  letterSpacing: 3,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: const Text(
+                  'MÓDULO DOCTOR',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: 3,
+                  ),
                 ),
               ),
               Text(

@@ -18,7 +18,7 @@ class DiscussionScreen extends StatefulWidget {
 }
 
 class _DiscussionScreenState extends State<DiscussionScreen> {
-  int _seconds = 120;
+  int _seconds = 60;
   Timer? _timer;
   bool _timerRunning = false;
 
@@ -34,6 +34,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
         'phase': 'discussion',
         'time': _seconds,
       });
+      _toggleTimer(); // Iniciar automáticamente
     });
   }
 
@@ -68,7 +69,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
 
   void _resetTimer() {
     _timer?.cancel();
-    setState(() { _seconds = 120; _timerRunning = false; });
+    setState(() { _seconds = 60; _timerRunning = false; });
   }
 
   String get _timeString {

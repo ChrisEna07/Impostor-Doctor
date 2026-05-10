@@ -131,13 +131,16 @@ class _WordRevealScreenState extends State<WordRevealScreen> {
           ),
           const SizedBox(height: 12),
 
-          Text(
-            player.name,
-            style: const TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.textPrimary,
-              letterSpacing: 1,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              player.name,
+              style: const TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.textPrimary,
+                letterSpacing: 1,
+              ),
             ),
           ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.3),
           const SizedBox(height: 8),
@@ -252,17 +255,20 @@ class _WordRevealScreenState extends State<WordRevealScreen> {
               ),
               child: Center(
                 child: wordVisible
-                    ? Text(
-                        word,
-                        style: const TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 1,
-                        ),
-                      ).animate().fadeIn(duration: 200.ms).scale(
-                          begin: const Offset(0.8, 0.8),
-                          duration: 200.ms)
+                    ? FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          word,
+                          style: const TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 1,
+                          ),
+                        ).animate().fadeIn(duration: 200.ms).scale(
+                            begin: const Offset(0.8, 0.8),
+                            duration: 200.ms),
+                      )
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [

@@ -1,6 +1,7 @@
 // lib/screens/multiplayer_lobby_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/foundation.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:provider/provider.dart';
 import '../models/player.dart';
@@ -36,6 +37,7 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
   bool _isDiscovering = false;
   Map<String, String> _connectedPlayers = {}; // id -> name
   Map<String, String> _availableRooms = {}; // id -> name
+  Map<String, bool> _readyPlayers = {}; // id -> isReady
   String? _statusMsg;
 
   @override
@@ -77,6 +79,10 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
               ),
             ),
           );
+        } else if (data['type'] == 'ready_toggle') {
+          setState(() {
+            _readyPlayers[id] = data['ready'] ?? false;
+          });
         }
       }
     };
@@ -137,16 +143,22 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
   }
 
   void _toggleHosting() {
+    if (kIsWeb) {
+      _showWebNotSupported();
+      return;
+    }
     if (_nameController.text.trim().isEmpty) {
       _showNameRequiredError();
       return;
     }
     AudioService.instance.playClick();
     if (_isHosting) {
-      MultiplayerService.instance.stopAll();
-      setState(() { _isHosting = false; _statusMsg = null; _availableRooms.clear(); });
+      MultiplayerService.instance.stopAdvertising();
+      setState(() { _isHosting = false; _statusMsg = null; });
     } else {
-      MultiplayerService.instance.stopAll(); 
+      if (_connectedPlayers.isEmpty) {
+        MultiplayerService.instance.stopAll(); 
+      }
       MultiplayerService.instance.startHosting(_nameController.text.trim());
       setState(() { 
         _isHosting = true; 
@@ -158,16 +170,22 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
   }
 
   void _toggleDiscovering() {
+    if (kIsWeb) {
+      _showWebNotSupported();
+      return;
+    }
     if (_nameController.text.trim().isEmpty) {
       _showNameRequiredError();
       return;
     }
     AudioService.instance.playClick();
     if (_isDiscovering) {
-      MultiplayerService.instance.stopAll();
+      MultiplayerService.instance.stopDiscovery();
       setState(() { _isDiscovering = false; _statusMsg = null; _availableRooms.clear(); });
     } else {
-      MultiplayerService.instance.stopAll(); 
+      if (_connectedPlayers.isEmpty) {
+        MultiplayerService.instance.stopAll(); 
+      }
       setState(() { 
         _isDiscovering = true; 
         _isHosting = false; 
@@ -187,16 +205,31 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
     );
   }
 
+  void _showWebNotSupported() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("🚫 El modo multijugador por red no es compatible con Web."),
+        backgroundColor: Colors.orangeAccent,
+      ),
+    );
+  }
+
   void _refreshDiscovery() {
     AudioService.instance.playClick();
-    MultiplayerService.instance.stopAll();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (_isHosting) {
-        MultiplayerService.instance.startHosting(_nameController.text.trim());
-      } else if (_isDiscovering) {
-        MultiplayerService.instance.startDiscovering(_nameController.text.trim());
-      }
-    });
+    if (_isHosting) {
+      MultiplayerService.instance.stopAdvertising().then((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _isHosting) MultiplayerService.instance.startHosting(_nameController.text.trim());
+        });
+      });
+    } else if (_isDiscovering) {
+      _availableRooms.clear();
+      MultiplayerService.instance.stopDiscovery().then((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _isDiscovering) MultiplayerService.instance.startDiscovering(_nameController.text.trim());
+        });
+      });
+    }
   }
 
   @override
@@ -287,9 +320,9 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                                   scrollDirection: Axis.horizontal,
                                   children: [
                                     // Yo (Host o Cliente local)
-                                    _playerBubble(_nameController.text.trim(), "TÚ (HOST)"),
+                                    _playerBubble(_nameController.text.trim(), "TÚ (HOST)", isReady: true),
                                     // Los demás
-                                    ..._connectedPlayers.entries.map((e) => _playerBubble(e.value, "CLIENTE")),
+                                    ..._connectedPlayers.entries.map((e) => _playerBubble(e.value, "CLIENTE", isReady: _readyPlayers[e.key] ?? false)),
                                   ],
                                 ),
                               ),
@@ -298,9 +331,11 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                           ),
 
                         GradientButton(
-                          text: _isHosting ? "CONFIGURAR PARTIDA" : (_isDiscovering ? (_connectedPlayers.isNotEmpty ? "CONECTADO" : "ESPERANDO AL HOST...") : "ELIGE MODO"),
+                          text: _isHosting 
+                            ? (_allReady ? "CONFIGURAR PARTIDA" : "ESPERANDO LISTOS...") 
+                            : (_isDiscovering ? (_connectedPlayers.isNotEmpty ? "CONECTADO" : "ESPERANDO AL HOST...") : "ELIGE MODO"),
                           icon: Icons.settings_suggest_rounded,
-                          onPressed: (_isHosting && _connectedPlayers.isNotEmpty) ? () {
+                          onPressed: (_isHosting && _connectedPlayers.isNotEmpty && _allReady) ? () {
                             AudioService.instance.playClick();
                             _startGameFlow();
                           } : null,
@@ -317,12 +352,31 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
     );
   }
 
-  Widget _playerBubble(String name, String role) {
+  bool get _allReady {
+    if (_connectedPlayers.isEmpty) return false;
+    return _connectedPlayers.keys.every((id) => _readyPlayers[id] == true);
+  }
+
+  Widget _playerBubble(String name, String role, {bool isReady = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         children: [
-          PlayerAvatar(name: name, size: 50),
+          Stack(
+            children: [
+              PlayerAvatar(name: name, size: 50),
+              if (isReady)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    child: const Icon(Icons.check_circle, color: AppTheme.safeGreen, size: 16),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
           Text(name, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
           Text(role, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 9)),
@@ -483,9 +537,9 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
           child: Column(
             children: [
               Text(widget.gameType.toUpperCase(), 
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 4)),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 4)),
               const Text("MULTIJUGADOR RED", 
-                style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: AppTheme.primary, fontSize: 10, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -525,8 +579,12 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                  Text(subtitle, style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  ),
+                  Text(subtitle, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                 ],
               ),
             ),

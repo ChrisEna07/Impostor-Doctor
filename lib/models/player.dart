@@ -6,6 +6,7 @@ class Player {
   bool isImpostor;
   final String? endpointId; // Si no es null, es un jugador remoto
   int votesReceived;
+  bool isReady;
 
   Player({
     required this.id,
@@ -14,6 +15,7 @@ class Player {
     this.isImpostor = false,
     this.endpointId,
     this.votesReceived = 0,
+    this.isReady = false,
   });
 
   Player copyWith({

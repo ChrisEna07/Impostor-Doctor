@@ -29,32 +29,62 @@ class _GameScreenState extends State<GameScreen> {
       
       // Escuchar cambios de fase y transmitir SOLO cuando cambia
       gp.addListener(() {
-        if (mounted) {
-          final phaseName = gp.phase.name;
-          if (phaseName != _lastPhase) {
-            _lastPhase = phaseName;
-            MultiplayerService.instance.broadcastData({
-              'type': 'phase_update',
-              'phase': phaseName,
-            });
+        if (!mounted) return;
+        
+        final phaseName = gp.phase.name;
+        if (phaseName != _lastPhase) {
+          _lastPhase = phaseName;
+          
+          // 1. Notificar cambio de fase básico
+          MultiplayerService.instance.broadcastData({
+            'type': 'phase_update',
+            'phase': phaseName,
+          });
+
+          // 2. Si entramos a Revelación (Inicio de ronda), enviar palabras a cada uno
+          if (gp.phase == GamePhase.wordReveal) {
+            _sendSecretWords(gp);
+          }
+
+          // 3. Si entramos a Fin de Ronda, enviar el marcador completo
+          if (gp.phase == GamePhase.roundEnd) {
+            _sendScoreboard(gp);
           }
         }
       });
 
+      // Iniciar la primera ronda
       await gp.startRound();
-      
-      for (var p in gp.players) {
-        if (p.endpointId != null) {
-          final word = p.isImpostor ? gp.currentWordPair?.impostor : gp.currentWordPair?.normal;
-          if (word != null) {
-            MultiplayerService.instance.sendDataTo(p.endpointId!, {
-              'type': 'game_data',
-              'secret': word,
-              'role': p.isImpostor ? 'Impostor' : 'Inocente',
-            });
-          }
+    });
+  }
+
+  void _sendSecretWords(GameProvider gp) {
+    for (var p in gp.players) {
+      if (p.endpointId != null) {
+        final word = p.isImpostor ? gp.currentWordPair?.impostor : gp.currentWordPair?.normal;
+        if (word != null) {
+          MultiplayerService.instance.sendDataTo(p.endpointId!, {
+            'type': 'game_data',
+            'secret': word,
+            'role': p.isImpostor ? 'Impostor' : 'Inocente',
+          });
         }
       }
+    }
+  }
+
+  void _sendScoreboard(GameProvider gp) {
+    final scores = gp.players.map((p) => {
+      'name': p.name,
+      'points': p.points,
+      'isImpostor': p.isImpostor,
+    }).toList();
+
+    MultiplayerService.instance.broadcastData({
+      'type': 'phase_update',
+      'phase': 'scoreboard',
+      'scores': scores,
+      'round': gp.currentRound,
     });
   }
 
