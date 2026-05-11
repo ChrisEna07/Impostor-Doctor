@@ -37,6 +37,8 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
   List<Map<String, dynamic>> _scores = [];
   int _currentRound = 1;
   bool _isReady = false;
+  String? _selectedVoteId;
+  String? _selectedNightTargetId;
 
   @override
   void initState() {
@@ -59,6 +61,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
               _timerSeconds = data['time'] ?? 0;
             } else if (phaseStr == 'voting') {
               _phase = ClientPhase.voting;
+              _selectedVoteId = null;
               _candidates = List<Map<String, dynamic>>.from(data['candidates'] ?? []);
             } else if (phaseStr == 'result' || phaseStr == 'voteResult') {
               _phase = ClientPhase.result;
@@ -71,6 +74,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
               if (_roleLabel == 'Asesino' || _roleLabel == 'asesino') {
                 _phase = ClientPhase.nightAction;
                 _nightActionType = 'assassin';
+                _selectedNightTargetId = null;
                 _nightTargets = List<Map<String, dynamic>>.from(data['targets'] ?? []);
               } else {
                 _phase = ClientPhase.waiting;
@@ -81,6 +85,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
               if (_roleLabel == 'Doctor' || _roleLabel == 'doctor') {
                 _phase = ClientPhase.nightAction;
                 _nightActionType = 'doctor';
+                _selectedNightTargetId = null;
                 _nightTargets = List<Map<String, dynamic>>.from(data['targets'] ?? []);
               } else {
                 _phase = ClientPhase.waiting;
@@ -239,7 +244,7 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white)),
         ),
         Expanded(
           child: ListView.builder(
@@ -247,21 +252,61 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
             itemCount: _candidates.length,
             itemBuilder: (context, i) {
               final c = _candidates[i];
-              return Card(
-                color: AppTheme.surface,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: ListTile(
-                  leading: PlayerAvatar(name: c['name'], size: 40),
-                  title: Text(c['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  trailing: const Icon(Icons.how_to_vote_rounded, color: AppTheme.primary),
-                  onTap: () {
-                    MultiplayerService.instance.sendData({'type': 'vote_cast', 'targetId': c['id']});
-                    setState(() { _phase = ClientPhase.waiting; _message = "Voto enviado. Esperando resultados..."; });
-                  },
+              final isSelected = _selectedVoteId == c['id'];
+              return GestureDetector(
+                onTap: () => setState(() => _selectedVoteId = c['id']),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppTheme.primary.withOpacity(0.8) : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isSelected ? AppTheme.primary : Colors.transparent, width: 2),
+                  ),
+                  child: Row(
+                    children: [
+                      PlayerAvatar(name: c['name'], size: 40),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(c['name'], 
+                          style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.white70, fontSize: 16)),
+                      ),
+                      if (isSelected) const Icon(Icons.check_circle_rounded, color: Colors.white),
+                    ],
+                  ),
                 ),
               );
             },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: GestureDetector(
+            onTap: _selectedVoteId != null ? () {
+              AudioService.instance.playVote();
+              MultiplayerService.instance.sendData({'type': 'vote_cast', 'targetId': _selectedVoteId});
+              setState(() { _phase = ClientPhase.waiting; _message = "Voto enviado. Esperando resultados..."; });
+            } : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: _selectedVoteId != null ? AppGradients.primary : null,
+                color: _selectedVoteId == null ? AppTheme.surfaceLight : null,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                "CONFIRMAR VOTO",
+                style: TextStyle(
+                  color: _selectedVoteId != null ? Colors.white : Colors.white38,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -290,39 +335,75 @@ class _RemotePlayerScreenState extends State<RemotePlayerScreen> {
         ),
         Expanded(
           child: _nightTargets.isEmpty
-              ? Center(child: Text("No hay objetivos disponibles", style: TextStyle(color: Colors.white54)))
+              ? const Center(child: Text("No hay objetivos disponibles", style: TextStyle(color: Colors.white54)))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   itemCount: _nightTargets.length,
                   itemBuilder: (context, i) {
                     final t = _nightTargets[i];
-                    return Card(
-                      color: AppTheme.surface,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: color.withOpacity(0.4)),
-                      ),
-                      child: ListTile(
-                        leading: PlayerAvatar(name: t['name'], size: 40),
-                        title: Text(t['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        trailing: Icon(icon, color: color),
-                        onTap: () {
-                          AudioService.instance.playClick();
-                          final eventType = isAssassin ? 'night_assassin_choice' : 'night_doctor_choice';
-                          final key = isAssassin ? 'targetId' : 'saveId';
-                          MultiplayerService.instance.sendData({"type": eventType, key: t['id']});
-                          setState(() {
-                            _nightActionDone = true;
-                            _phase = ClientPhase.waiting;
-                            _message = isAssassin ? "Acción enviada. Espera el amanecer..." : "¡Jugador protegido! Espera el amanecer...";
-                          });
-                        },
+                    final isSelected = _selectedNightTargetId == t['id'];
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedNightTargetId = t['id']),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? color.withOpacity(0.8) : AppTheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isSelected ? color : Colors.transparent, width: 2),
+                        ),
+                        child: Row(
+                          children: [
+                            PlayerAvatar(name: t['name'], size: 40),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(t['name'], 
+                                style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.white70, fontSize: 16)),
+                            ),
+                            if (isSelected) Icon(icon, color: Colors.white),
+                          ],
+                        ),
                       ),
                     );
                   },
                 ),
         ),
+        if (_nightTargets.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: GestureDetector(
+              onTap: _selectedNightTargetId != null ? () {
+                AudioService.instance.playClick();
+                final eventType = isAssassin ? 'night_assassin_choice' : 'night_doctor_choice';
+                final key = isAssassin ? 'targetId' : 'saveId';
+                MultiplayerService.instance.sendData({"type": eventType, key: _selectedNightTargetId});
+                setState(() {
+                  _nightActionDone = true;
+                  _phase = ClientPhase.waiting;
+                  _message = isAssassin ? "Acción enviada. Espera el amanecer..." : "¡Jugador protegido! Espera el amanecer...";
+                });
+              } : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: _selectedNightTargetId != null ? color : AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  "CONFIRMAR ACCIÓN",
+                  style: TextStyle(
+                    color: _selectedNightTargetId != null ? Colors.white : Colors.white38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

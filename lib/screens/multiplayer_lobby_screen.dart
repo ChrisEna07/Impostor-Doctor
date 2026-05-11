@@ -320,9 +320,9 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                                   scrollDirection: Axis.horizontal,
                                   children: [
                                     // Yo (Host o Cliente local)
-                                    _playerBubble(_nameController.text.trim(), "TÚ (HOST)", isReady: true),
+                                    _playerBubble(_nameController.text.trim(), _isHosting ? "TÚ (HOST)" : "TÚ (CLIENTE)", isReady: true),
                                     // Los demás
-                                    ..._connectedPlayers.entries.map((e) => _playerBubble(e.value, "CLIENTE", isReady: _readyPlayers[e.key] ?? false)),
+                                    ..._connectedPlayers.entries.map((e) => _playerBubble(e.value, _isHosting ? "CLIENTE" : "JUGADOR", isReady: _readyPlayers[e.key] ?? false)),
                                   ],
                                 ),
                               ),
@@ -332,10 +332,10 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
 
                         GradientButton(
                           text: _isHosting 
-                            ? (_allReady ? "CONFIGURAR PARTIDA" : "ESPERANDO LISTOS...") 
-                            : (_isDiscovering ? (_connectedPlayers.isNotEmpty ? "CONECTADO" : "ESPERANDO AL HOST...") : "ELIGE MODO"),
-                          icon: Icons.settings_suggest_rounded,
-                          onPressed: (_isHosting && _connectedPlayers.isNotEmpty && _allReady) ? () {
+                            ? "CONFIGURAR PARTIDA" 
+                            : (_connectedPlayers.isNotEmpty ? "CONECTADO - ESPERANDO..." : "ELIGE TU ROL"),
+                          icon: _isHosting ? Icons.settings_suggest_rounded : Icons.sync_rounded,
+                          onPressed: (_isHosting && _connectedPlayers.isNotEmpty) ? () {
                             AudioService.instance.playClick();
                             _startGameFlow();
                           } : null,

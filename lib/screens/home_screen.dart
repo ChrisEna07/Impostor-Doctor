@@ -115,145 +115,147 @@ class _HomeScreenState extends State<HomeScreen> {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Column(
-                children: [
-                  const SizedBox(height: 32),
-
-                  // ── LOGO ──────────────────────────────────────────────────
-                  _buildLogo().animate().fadeIn(duration: 700.ms).slideY(begin: -0.2),
-
-                  const SizedBox(height: 48),
-
-                  // ── MÓDULOS ───────────────────────────────────────────────
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Selector de Modo (Local vs Multiplayer)
-                        _buildModeSelector(),
-                        const SizedBox(height: 32),
-
-                        // Módulo Impostor
-                        _moduleCard(
-                          emoji: '😈',
-                          title: 'Impostor',
-                          subtitle: 'Descubre quién tiene la\npalabra diferente',
-                          gradient: AppGradients.primary,
-                          glowColor: AppTheme.primary,
-                          delay: 200,
-                          onTap: () {
-                            AudioService.instance.playClick();
-                            if (_isMultiplayer) {
-                              _goToLobby('Impostor');
-                            } else {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ChangeNotifierProvider(
-                                    create: (_) => GameProvider(),
-                                    child: const SetupScreen(),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ).animate()
-                         .fadeIn(duration: 600.ms, delay: 200.ms)
-                         .slideX(begin: 0.2, curve: Curves.easeOutQuart)
-                         .shimmer(delay: 1500.ms, duration: 1200.ms, color: Colors.white24),
-
-                        const SizedBox(height: 24),
-
-                        // Módulo Doctor
-                        _moduleCard(
-                          emoji: '💉',
-                          title: 'Doctor',
-                          subtitle: 'El pueblo contra\nel asesino oculto',
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF1A8C6A), Color(0xFF0D4D3A)],
-                          ),
-                          glowColor: const Color(0xFF1A8C6A),
-                          delay: 350,
-                          onTap: () {
-                            AudioService.instance.playClick();
-                            if (_isMultiplayer) {
-                              _goToLobby('Doctor');
-                            } else {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ChangeNotifierProvider(
-                                    create: (_) => DoctorGameProvider(),
-                                    child: const DoctorSetupScreen(),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ).animate()
-                         .fadeIn(duration: 600.ms, delay: 400.ms)
-                         .slideX(begin: -0.2, curve: Curves.easeOutQuart)
-                         .shimmer(delay: 2000.ms, duration: 1200.ms, color: Colors.white24),
-                      ],
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
                     ),
-                  ),
-
-                  // ── FOOTER ────────────────────────────────────────────────
-                  Column(
-                    children: [
-                      // Firma ChrizDev
-                      const Text(
-                        'by ChrizDev',
-                        style: TextStyle(
-                          color: Color(0xFF39FF14), // Neon Green
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                          shadows: [
-                            Shadow(color: Color(0xFF39FF14), blurRadius: 10),
-                          ],
-                        ),
-                      ).animate(onPlay: (c) => c.repeat(reverse: true))
-                       .scale(end: const Offset(1.1, 1.1), duration: 1000.ms),
-                      
-                      const SizedBox(height: 12),
-
-                      Row(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'v$_version',
-                            style: TextStyle(
-                                color: AppTheme.textSecondary.withOpacity(0.5),
-                                fontSize: 12),
-                          ),
-                          Row(
+                          // ── LOGO ──────────────────────────────────────────────────
+                          _buildLogo().animate().fadeIn(duration: 700.ms).slideY(begin: -0.2),
+        
+                          // ── MÓDULOS ───────────────────────────────────────────────
+                          Column(
                             children: [
-                              IconButton(
-                                onPressed: () {
-                                  setState(() => _muted = !_muted);
-                                  AudioService.instance.toggleMute();
+                              _buildModeSelector(),
+                              const SizedBox(height: 32),
+        
+                              // Módulo Impostor
+                              _moduleCard(
+                                emoji: '😈',
+                                title: 'Impostor',
+                                subtitle: 'Descubre quién tiene la\npalabra diferente',
+                                gradient: AppGradients.primary,
+                                glowColor: AppTheme.primary,
+                                delay: 200,
+                                onTap: () {
+                                  AudioService.instance.playClick();
+                                  if (_isMultiplayer) {
+                                    _goToLobby('Impostor');
+                                  } else {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ChangeNotifierProvider(
+                                          create: (_) => GameProvider(),
+                                          child: const SetupScreen(),
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 },
-                                icon: Icon(
-                                  _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                                  color: AppTheme.textSecondary,
-                                  size: 20,
+                              ).animate()
+                               .fadeIn(duration: 600.ms, delay: 200.ms)
+                               .slideX(begin: 0.2, curve: Curves.easeOutQuart)
+                               .shimmer(delay: 1500.ms, duration: 1200.ms, color: Colors.white24),
+        
+                              const SizedBox(height: 20),
+        
+                              // Módulo Doctor
+                              _moduleCard(
+                                emoji: '💉',
+                                title: 'Doctor',
+                                subtitle: 'El pueblo contra\nel asesino oculto',
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [Color(0xFF1A8C6A), Color(0xFF0D4D3A)],
                                 ),
-                              ),
-                              Text(
-                                _muted ? 'OFF' : 'ON',
-                                style: const TextStyle(
-                                    color: AppTheme.textSecondary, fontSize: 11),
-                              ),
+                                glowColor: const Color(0xFF1A8C6A),
+                                delay: 350,
+                                onTap: () {
+                                  AudioService.instance.playClick();
+                                  if (_isMultiplayer) {
+                                    _goToLobby('Doctor');
+                                  } else {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ChangeNotifierProvider(
+                                          create: (_) => DoctorGameProvider(),
+                                          child: const DoctorSetupScreen(),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ).animate()
+                               .fadeIn(duration: 600.ms, delay: 400.ms)
+                               .slideX(begin: -0.2, curve: Curves.easeOutQuart)
+                               .shimmer(delay: 2000.ms, duration: 1200.ms, color: Colors.white24),
                             ],
                           ),
+        
+                          // ── FOOTER ────────────────────────────────────────────────
+                          Column(
+                            children: [
+                              // Firma ChrizDev
+                              const Text(
+                                'by ChrizDev',
+                                style: TextStyle(
+                                  color: Color(0xFF39FF14), // Neon Green
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2,
+                                  shadows: [
+                                    Shadow(color: Color(0xFF39FF14), blurRadius: 10),
+                                  ],
+                                ),
+                              ).animate(onPlay: (c) => c.repeat(reverse: true))
+                               .scale(end: const Offset(1.1, 1.1), duration: 1000.ms),
+                              
+                              const SizedBox(height: 8),
+        
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'v$_version',
+                                    style: TextStyle(
+                                        color: AppTheme.textSecondary.withOpacity(0.5),
+                                        fontSize: 12),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () {
+                                          setState(() => _muted = !_muted);
+                                          AudioService.instance.toggleMute();
+                                        },
+                                        icon: Icon(
+                                          _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                                          color: AppTheme.textSecondary,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      Text(
+                                        _muted ? 'OFF' : 'ON',
+                                        style: const TextStyle(
+                                            color: AppTheme.textSecondary, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ).animate().fadeIn(delay: 800.ms),
                         ],
                       ),
-                    ],
-                  ).animate().fadeIn(delay: 800.ms),
-                  const SizedBox(height: 12),
-                ],
-              ),
+                    ),
+                  ),
+                ),
             ),
           ),
         ),

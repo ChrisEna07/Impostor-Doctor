@@ -25,28 +25,34 @@ class _VotingScreenState extends State<VotingScreen> {
   bool _confirming = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final gp = context.read<GameProvider>();
+      bool isMultiplayer = gp.players.any((p) => p.endpointId != null);
+      if (isMultiplayer) {
+        MultiplayerService.instance.onDataReceived = (id, data) {
+          if (data is Map && data['type'] == 'vote_cast' && mounted) {
+            context.read<GameProvider>().castVote(data['targetId'], voterId: id);
+          }
+        };
+      }
+    });
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final gp = context.read<GameProvider>();
     bool isMultiplayer = gp.players.any((p) => p.endpointId != null);
 
     if (isMultiplayer) {
-      _step = 1; // Directo a votar
-      // Enviar lista de candidatos a todos los remotos
+      // Enviar lista de candidatos una sola vez al entrar
       MultiplayerService.instance.broadcastData({
         'type': 'phase_update',
         'phase': 'voting',
         'candidates': gp.players.map((p) => {'id': p.id, 'name': p.name}).toList(),
       });
-      
-      // Escuchar votos remotos
-      MultiplayerService.instance.onDataReceived = (id, data) {
-        if (data is Map && data['type'] == 'vote_cast' && mounted) {
-          context.read<GameProvider>().castVote(data['targetId'], voterId: id);
-        }
-      };
-    } else {
-      _step = 0;
     }
     _selectedSuspectId = null;
   }
@@ -204,6 +210,27 @@ class _VotingScreenState extends State<VotingScreen> {
     int totalVotes = gp.votes.length;
     int totalPlayers = gp.players.length;
 
+    // Si el Host está votando ahora mismo, mostramos solo la lista de votación para evitar lag y desorden
+    if (_step == 1) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => setState(() => _step = 0), 
+                  icon: const Icon(Icons.arrow_back, color: Colors.white)
+                ),
+                const Text("REGRESAR AL ESTADO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Expanded(child: _buildVoteStep(gp, gp.players.firstWhere((p) => p.id == 'local_host'))),
+        ],
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -231,12 +258,6 @@ class _VotingScreenState extends State<VotingScreen> {
             const Text("Ya has emitido tu voto. Esperando a los demás...", 
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.safeGreen, fontWeight: FontWeight.bold)),
-
-          if (_step == 1)
-            ...[
-              const SizedBox(height: 24),
-              Expanded(child: _buildVoteStep(gp, gp.players.firstWhere((p) => p.id == 'local_host'))),
-            ]
         ],
       ),
     );
@@ -244,7 +265,8 @@ class _VotingScreenState extends State<VotingScreen> {
 
   // ── Panel de votación ─────────────────────────────────────────────────────
   Widget _buildVoteStep(GameProvider gp, dynamic voter) {
-    final candidates = gp.players.where((p) => p.id != voter.id).toList();
+    // Permitir votar por CUALQUIERA (incluido uno mismo)
+    final candidates = gp.players;
 
     return Padding(
       padding: const EdgeInsets.all(24),
