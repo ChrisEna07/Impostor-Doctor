@@ -23,6 +23,18 @@
 
 ---
 
+## 📸 Capturas de Pantalla
+
+<div align="center">
+  <img src="screenshots/pantalla%20de%20inicio.png" alt="Pantalla de Inicio" width="180" style="margin: 5px;"/>
+  <img src="screenshots/modo%20de%20juego%20impostor(local).png" alt="Modo Impostor Local" width="180" style="margin: 5px;"/>
+  <img src="screenshots/modo%20de%20juego%20impostor(red).png" alt="Modo Impostor Multijugador" width="180" style="margin: 5px;"/>
+  <img src="screenshots/modo%20de%20juego%20doctor(local).png" alt="Modo Doctor Local" width="180" style="margin: 5px;"/>
+  <img src="screenshots/modo%20de%20juego%20doctor(red).png" alt="Modo Doctor Multijugador" width="180" style="margin: 5px;"/>
+</div>
+
+---
+
 ## 🃏 Módulos de Juego
 
 ### 😈 Módulo Impostor
